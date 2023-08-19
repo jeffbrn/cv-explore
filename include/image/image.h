@@ -19,8 +19,7 @@ public:
 private:
     int dim_x_{0};
     int dim_y_{0};
-    Eigen::Array<uint8_t, Eigen::Dynamic, Eigen::Dynamic> img_ = Eigen::Array<uint8_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(
-            0, 0);
+    Eigen::Array<uint8_t, Eigen::Dynamic, Eigen::Dynamic> img_ = Eigen::Array<uint8_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(0, 0);
 };
 
 }
