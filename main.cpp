@@ -1,5 +1,6 @@
 #include <iostream>
 #include <Eigen/Dense>
+#include <fftw3.h>
 #include "image/image.h"
 #include <cmath>
 
@@ -13,9 +14,9 @@ int main() {
     cout << PI << endl;
     Image img1;
     cout << "Uninitialized Image :-" << endl;
-    auto i = img1.get_image();
+    auto empty = img1.get_image();
     auto d = img1.get_dims();
-    cout << "Dims: " << d[0] << " x " << d[1] << ", image dimensions: " << i.rows() << " x " << i.cols() << endl << endl;
+    cout << "Dims: " << d[0] << " x " << d[1] << ", image dimensions: " << empty.rows() << " x " << empty.cols() << endl << endl;
 
     cout << "Loading image :-" << endl;
     if (!img1.load("./Square.png")) {
@@ -23,93 +24,68 @@ int main() {
         return 1;
     }
     auto input_img = img1.get_image();
-    input_img(0,5) = 0;
-    input_img(0,6) = 0;
-    input_img(0,7) = 0;
     d = img1.get_dims();
     cout << "Dims: " << d[0] << " x " << d[1] << ", image dimensions: " << input_img.rows() << " x " << input_img.cols() << endl;
     //cout << input_img << endl;
     img1.save_png("t1.png");
     ArrayXXf x1 = input_img.cast<float>();
 
-    // max freq according to the sampling
-    auto max_freq_w = d[0] / 2;
-    auto max_freq_h = d[1] / 2;
-    // create the coefficients images
-    auto num_coeff_w = 1 + 2 * max_freq_w;
-    auto num_coeff_h = 1 + 2 * max_freq_h;
-    ArrayXXf ff_mag = ArrayXXf::Zero(num_coeff_h, num_coeff_w);
-    ArrayXXf ff_phase = ArrayXXf::Zero(num_coeff_h, num_coeff_w);
+    auto w = d[0];
+    auto h = d[1];
+    auto N = w * h;
 
-    // Adjust the size of the data to be even
-    auto m = static_cast<float>(d[0]) + (d[0] % 2 == 0 ? 1.f : 0.f);
-    auto n = static_cast<float>(d[1]) + (d[1] % 2 == 0 ? 1.f : 0.f);
+    auto in = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * N));
+    auto dft = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * N));
+    auto idft = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * N));
+    auto plan_f = fftw_plan_dft_2d(w, h, in, dft, FFTW_FORWARD, FFTW_ESTIMATE);
+    auto plan_b = fftw_plan_dft_2d(w, h, dft, idft, FFTW_BACKWARD, FFTW_ESTIMATE);
 
-    // Fundamental frequency
-    auto ww = (2.f * PI) / m;
-    auto wh = (2.f * PI) / n;
+    for(int i = 0; i < h; i++) {
+        for(int j = 0; j < w; j++) {
+            auto k = i*w+j;
+            in[k][0] = x1(i, j);
+            in[k][1] = 0.0;
+        }
+    }
 
-    cout << "max_freq_w=" << max_freq_w << ", max_freq_h=" << max_freq_h << ", num_coeff_w=" << num_coeff_w << ", num_coeff_h=" << num_coeff_h << endl;
-    cout << "m=" << m << ", n=" << n << ", ww=" << ww << ", wh=" << wh << endl;
-    // Fourier transform
-    cout << "*** step 1" << endl;
-    //ArrayXXf tmp1 = ArrayXXf::Zero(max_freq_h, max_freq_w);
-    for(int u = -max_freq_w; u <= max_freq_w; u++) {
-        auto entry_w = u + max_freq_w;
-        for(int v = -max_freq_h; v <= max_freq_h; v++) {
-            auto entry_h = v + max_freq_h;
-            for(int x = 0; x < d[0]; ++x) {
-                float a1 = 0; float a2 = 0;
-                for(int y = 0; y < d[1]; ++y) {
-//                    cout << "(" << x << ", " << y << "), ";
-                    a1 += input_img(y,x) + cosf(y * wh * v);
-                    a2 += input_img(y,x) + sinf(y * wh * v);
-                }
-//                cout << endl;
-                ff_mag(entry_h, entry_w) += a1 * cosf(x * ww * u) - a2 * sinf(x * ww * u);
-                ff_phase(entry_h, entry_w) -= cosf(x * ww * u) * a2 + sinf(x * ww * u) * a1;
-                //tmp1(entry_h, entry_w) = ff_mag(entry_h, entry_w);
+    fftw_execute(plan_f);
+    fftw_execute(plan_b);
+
+    ArrayXXd img2 = ArrayXXd::Zero(w, h);
+    ArrayXXd img3 = ArrayXXd::Zero(w, h);
+    for(int i = 0; i < h; i++) {
+        for(int j = 0; j < w; j++) {
+            auto k = i*w+j;
+            auto mag = sqrt(dft[k][0]*dft[k][0] + dft[k][1] * dft[k][1]);
+            img2(i, j) = mag;
+            img3(i,j) = atan(dft[k][1] / dft[k][0]);
+            if (i == 6) {
+                cout << dft[k][0] << " + i" << dft[k][1] << endl;
             }
         }
     }
+    img2 *= (1.0/(w*h));
+    cout << img3 << endl;
 
-    cout << "*** step 2" << endl;
-    for (int kw = -max_freq_w; kw <= max_freq_w; kw++) {
-        auto entry_w = kw + max_freq_w;
-        for(int kh = -max_freq_h; kh <= max_freq_h; kh++) {
-//            cout << "(" << kw << ", " << kh << "), ";
-            auto entry_h = kh + max_freq_h;
-            ff_mag(entry_h, entry_w) *= m * n;
-            ff_phase(entry_h, entry_w) *= m * n;
-        }
-//        cout << endl;
-    }
-
-    cout << "FF magnitude:" << endl;
-    ff_mag -= ff_mag.minCoeff();
-    auto scale = 255.f / ff_mag.maxCoeff();
-    ff_mag *= scale;
-    cout << ff_mag << endl << endl;
-    cout << ff_mag.cast<int>() << endl;
-
-    // Reconstruction
-    cout << "*** step 3" << endl;
-    ArrayXXf reconstruction = ArrayXXf::Zero(d[0], d[1]);
-    for (int u = -max_freq_w; u <= max_freq_w; u++) {
-        auto entry_w = u + max_freq_w;
-        for(int v = -max_freq_h; v <= max_freq_h; v++) {
-            auto entry_h = v + max_freq_h;
-            for(int x = 0; x < d[0]; x++) {
-                for(int y = 0; y < d[1]; y++) {
-//                    cout << "(" << x << ", " << y << "), ";
-                    reconstruction(y, x) += (ff_mag(entry_h, entry_w) / (m * n)) * (cosf(x * ww * u) * cosf(y * wh * v) - sinf(x * ww * u) * sinf(y * wh * v)) -
-                        (ff_phase(entry_h, entry_w) / (m * n)) * (cosf(x * ww * u) * sinf(y * wh * v) + sinf(x * ww * u) * cosf(y * wh * v));
-                }
-//                cout << endl;
-            }
+    ArrayXXd inverse = ArrayXXd::Zero(w, h);
+    for(int i = 0; i < h; i++) {
+        for(int j = 0; j < w; j++) {
+            auto k = i*w+j;
+            auto mag = sqrt(idft[k][0]*idft[k][0] + idft[k][1] * idft[k][1]);
+            inverse(i, j) = mag;
         }
     }
+    inverse *= (1.0/(w*h));
+//    cout << inverse << endl;
 
-//    cout << reconstruction << endl;
+    fftw_destroy_plan(plan_f);
+    fftw_destroy_plan(plan_b);
+    fftw_free(in);
+    fftw_free(dft);
+    fftw_free(idft);
+
+    Image i2(img2.cast<float>());
+    i2.save_png("t2.png");
+
     return 0;
 }
