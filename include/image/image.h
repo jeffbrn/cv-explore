@@ -9,11 +9,11 @@ namespace jeffb::cv::image {
 
 class Image {
 public:
-    Image() {}
-    Image(Eigen::ArrayXXf pixels);
+    Image() = default;
+    explicit Image(Eigen::ArrayXXf pixels);
 
-    bool load(std::string);
-    void save_png(std::string);
+    bool load(const std::string&);
+    void save_png(const std::string&);
 
     [[nodiscard]]
     std::array<int, 2> get_dims() const { return {dim_x_, dim_y_}; }

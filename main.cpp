@@ -26,7 +26,6 @@ int main() {
     auto input_img = img1.get_image();
     d = img1.get_dims();
     cout << "Dims: " << d[0] << " x " << d[1] << ", image dimensions: " << input_img.rows() << " x " << input_img.cols() << endl;
-    //cout << input_img << endl;
     img1.save_png("t1.png");
     ArrayXXf x1 = input_img.cast<float>();
 
@@ -76,7 +75,6 @@ int main() {
         }
     }
     inverse *= (1.0/(w*h));
-//    cout << inverse << endl;
 
     fftw_destroy_plan(plan_f);
     fftw_destroy_plan(plan_b);
