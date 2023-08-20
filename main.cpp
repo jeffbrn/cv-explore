@@ -22,10 +22,15 @@ int main() {
         cout << "failed to load image" << endl;
         return 1;
     }
-    Array<uint8_t, Dynamic, Dynamic> input_img = img1.get_image();
+    auto input_img = img1.get_image();
+    input_img(0,5) = 0;
+    input_img(0,6) = 0;
+    input_img(0,7) = 0;
     d = img1.get_dims();
     cout << "Dims: " << d[0] << " x " << d[1] << ", image dimensions: " << input_img.rows() << " x " << input_img.cols() << endl;
     //cout << input_img << endl;
+    img1.save_png("t1.png");
+    ArrayXXf x1 = input_img.cast<float>();
 
     // max freq according to the sampling
     auto max_freq_w = d[0] / 2;
@@ -81,7 +86,11 @@ int main() {
     }
 
     cout << "FF magnitude:" << endl;
-    cout << ff_mag << endl;
+    ff_mag -= ff_mag.minCoeff();
+    auto scale = 255.f / ff_mag.maxCoeff();
+    ff_mag *= scale;
+    cout << ff_mag << endl << endl;
+    cout << ff_mag.cast<int>() << endl;
 
     // Reconstruction
     cout << "*** step 3" << endl;
