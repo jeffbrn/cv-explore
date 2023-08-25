@@ -10,6 +10,7 @@ include(cmake/debug.cmake)
 
 add_executable(cv1 main.cpp
     src/image/image.cpp
+    src/filters/fft.cpp
 )
 target_include_directories(cv1 PUBLIC include PRIVATE ${fftw_SOURCE_DIR}/api)
 target_link_libraries(cv1 Eigen3::Eigen fftw3)
